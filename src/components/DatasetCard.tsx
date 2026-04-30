@@ -80,7 +80,8 @@ export function DatasetCard({
   const handleDownloadManifest = async () => {
     try {
       const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
-      const response = await fetch(`${API_BASE_URL}/files/manifests/${dataset.id}_manifest.json`);
+      const manifestPath = dataset.manifestFile || `manifests/${dataset.id}_manifest.json`;
+      const response = await fetch(`${API_BASE_URL}/files/${manifestPath}`);
       
       if (!response.ok) {
         throw new Error(`Failed to download manifest: ${response.statusText}`);
@@ -90,7 +91,8 @@ export function DatasetCard({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `manifest-${dataset.id}.json`;
+      const manifestFileName = manifestPath.split('/').pop() || `manifest-${dataset.id}.json`;
+      a.download = manifestFileName;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -469,7 +471,7 @@ export function DatasetCard({
                 onClick={handleDownloadManifest}
               >
                 <Download className="h-4 w-4 mr-1" />
-                Download
+                Get Manifest
               </Button>
             </div>
           )}
