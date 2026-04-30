@@ -328,6 +328,39 @@ export function AuthenticatedApp() {
     }
   };
 
+  const handleUpdateTags = async (id: string, tags: string[]) => {
+    try {
+      const token = keycloak?.token;
+      if (!token) {
+        toast.error('Failed to update tags', {
+          description: 'No authentication token available'
+        });
+        return;
+      }
+
+      const updatedDataset = await apiClient.updateDatasetTags(id, tags, token);
+      if (!updatedDataset) {
+        toast.error('Failed to update tags', {
+          description: 'Dataset not found'
+        });
+        return;
+      }
+
+      setDatasets((prev) => prev.map((dataset) => (
+        dataset.id === id ? updatedDataset : dataset
+      )));
+
+      toast.success('Tags updated', {
+        description: 'Dataset tags were saved successfully.'
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to update tags', {
+        description: message
+      });
+    }
+  };
+
   const handleExploreDataset = (dataset: Dataset) => {
     setSelectedDataset(dataset);
     setViewMode('explore');
@@ -532,6 +565,7 @@ export function AuthenticatedApp() {
             onApproveDataset={handleApproveDataset}
             onRejectDataset={handleRejectDataset}
             onRemoveDataset={handleRemoveDataset}
+            onUpdateTags={handleUpdateTags}
           />
         ) : viewMode === 'explore' && selectedDataset ? (
           <ExploreDataset

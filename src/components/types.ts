@@ -56,6 +56,7 @@ export interface AdminDashboardProps {
   onApproveDataset: (id: string) => void;
   onRejectDataset: (id: string) => void;
   onRemoveDataset: (id: string) => void;
+  onUpdateTags: (id: string, tags: string[]) => Promise<void>;
 }
 
 export interface PublicDirectoryProps {
@@ -69,6 +70,7 @@ export interface DatasetCardProps {
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
   onRemove?: (id: string) => void;
+  onUpdateTags?: (id: string, tags: string[]) => Promise<void>;
   onDownloadCache?: (id: string) => void;
   onExplore?: (dataset: Dataset) => void;
 }
