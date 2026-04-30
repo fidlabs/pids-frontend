@@ -454,13 +454,6 @@ async function syncClientConfig(adminToken) {
 // Main initialization function
 async function initializeKeycloak() {
   try {
-    console.log('🔐 Initializing Keycloak...');
-    console.log(`   Keycloak Internal URL (for admin API): ${KEYCLOAK_URL}`);
-    console.log(`   Keycloak External URL (for redirect URIs): ${KEYCLOAK_EXTERNAL_URL}`);
-    console.log(`   Frontend URL: ${process.env.FRONTEND_URL || 'not set'}`);
-    console.log(`   Realm: ${KEYCLOAK_REALM}`);
-    console.log(`   Client ID: ${KEYCLOAK_CLIENT_ID}`);
-    
     // Wait for Keycloak to be ready
     await waitForKeycloak();
     
