@@ -452,8 +452,6 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Transform API dataset to frontend format
 const transformDataset = (apiDataset: any): Dataset => {
-  console.log('🔍 transformDataset input:', apiDataset);
-  
   try {
     const transformed = {
       id: apiDataset._id,
@@ -464,6 +462,7 @@ const transformDataset = (apiDataset: any): Dataset => {
       verifiedDate: apiDataset.dateUpdated ? new Date(apiDataset.dateUpdated).toISOString().split('T')[0] : '',
       description: apiDataset.description,
       size: formatBytes(apiDataset.size),
+      sizeBytes: typeof apiDataset.size === 'number' ? apiDataset.size : undefined,
       tags: apiDataset.tags || [],
       downloadUrl: '#', // Placeholder
       projectUrl: apiDataset.projectUrl, // Project website URL from manifest
@@ -472,8 +471,7 @@ const transformDataset = (apiDataset: any): Dataset => {
       pieces: apiDataset.pieces || undefined, // Include pieces from manifest format
       network: apiDataset.network || 'mainnet' // Network (mainnet or calibration)
     };
-    
-    console.log('✅ transformDataset output:', transformed);
+
     return transformed;
   } catch (error) {
     console.error('❌ transformDataset error:', error, 'for dataset:', apiDataset);
@@ -482,9 +480,7 @@ const transformDataset = (apiDataset: any): Dataset => {
 };
 
 // Transform file structure
-const transformFileStructure = (files: any[]): FileStructure[] => {
-  console.log('🔍 transformFileStructure input:', files);
-  
+const transformFileStructure = (files: any[]): FileStructure[] => {  
   try {
     const transformed = files.map(file => ({
       id: file._id || file.name,
@@ -505,8 +501,7 @@ const transformFileStructure = (files: any[]): FileStructure[] => {
       // File path for MinIO access
       path: file.path
     }));
-    
-    console.log('✅ transformFileStructure output:', transformed);
+
     return transformed;
   } catch (error) {
     console.error('❌ transformFileStructure error:', error, 'for files:', files);
@@ -695,7 +690,6 @@ const mockApi = {
 const realApi = {
   async getDatasets(searchQuery: string = '', filters: SearchFilters = { tags: [], dateRange: 'all', sizeRange: 'all' }, page: number = 1, limit: number = 20, token?: string, network?: 'mainnet' | 'calibration'): Promise<PaginatedDatasets> {
     console.log('🚀 getDatasets called with:', { searchQuery, filters, page, limit, hasToken: !!token, network });
-    console.log('🌐 API_BASE_URL:', API_BASE_URL);
     
     try {
       const params = new URLSearchParams();
@@ -706,7 +700,6 @@ const realApi = {
       params.append('limit', limit.toString());
 
       const url = `${API_BASE_URL}/datasets?${params}`;
-      console.log('🌐 Fetching from URL:', url);
 
       // Prepare headers
       const headers: HeadersInit = {
@@ -716,12 +709,9 @@ const realApi = {
       // Add Authorization header if token is provided
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
-        console.log('🔑 Adding Authorization header');
       }
 
-      console.log('📡 Making fetch request to:', url);
       const response = await fetch(url, { headers });
-      console.log('📡 Response status:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -730,21 +720,15 @@ const realApi = {
       }
 
       const result: ApiResponse<any[]> = await response.json();
-      console.log('📦 Raw API response:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch datasets');
       }
 
-      console.log('🔢 Number of datasets from API:', result.data?.length || 0);
-
       // Transform API data to frontend format
-      const transformedDatasets = result.data.map((dataset, index) => {
-        console.log(`🔄 Transforming dataset ${index + 1}/${result.data.length}`);
+      const transformedDatasets = result.data.map((dataset) => {
         return transformDataset(dataset);
       });
-
-      console.log('✅ Final transformed datasets:', transformedDatasets);
 
       const paginatedResult = {
         datasets: transformedDatasets,
@@ -756,7 +740,6 @@ const realApi = {
         }
       };
 
-      console.log('🎯 Returning paginated result:', paginatedResult);
       return paginatedResult;
       
     } catch (error) {
@@ -955,7 +938,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for getDatasets');
         return await mockApi.getDatasets(searchQuery, filters, page, limit, token, network);
       } else {
-        console.log('🔄 Using real API for getDatasets');
         return await realApi.getDatasets(searchQuery, filters, page, limit, token, network);
       }
     } catch (error) {
@@ -971,7 +953,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for getDataset');
         return await mockApi.getDataset(id);
       } else {
-        console.log('🔄 Using real API for getDataset');
         return await realApi.getDataset(id, token);
       }
     } catch (error) {
@@ -987,7 +968,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for createDataset');
         return await mockApi.createDataset(dataset);
       } else {
-        console.log('🔄 Using real API for createDataset');
         return await realApi.createDataset(dataset, token);
       }
     } catch (error) {
@@ -1003,7 +983,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for updateDataset');
         return await mockApi.updateDataset(id, updates);
       } else {
-        console.log('🔄 Using real API for updateDataset');
         return await realApi.updateDataset(id, updates, token);
       }
     } catch (error) {
@@ -1019,7 +998,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for deleteDataset');
         return await mockApi.deleteDataset(id);
       } else {
-        console.log('🔄 Using real API for deleteDataset');
         return await realApi.deleteDataset(id, token);
       }
     } catch (error) {
@@ -1035,7 +1013,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for approveDataset');
         return await mockApi.approveDataset(id);
       } else {
-        console.log('🔄 Using real API for approveDataset');
         return await realApi.approveDataset(id, token);
       }
     } catch (error) {
@@ -1051,7 +1028,6 @@ export const apiClient = {
         console.log('🔄 Using mock data for rejectDataset');
         return await mockApi.rejectDataset(id);
       } else {
-        console.log('🔄 Using real API for rejectDataset');
         return await realApi.rejectDataset(id, token);
       }
     } catch (error) {
@@ -1086,7 +1062,6 @@ export const apiClient = {
           { tag: 'animals', count: 1 }
         ];
       } else {
-        console.log('🔄 Using real API for getTags');
         const response = await fetch(`${API_BASE_URL}/datasets/tags`);
         
         if (!response.ok) {

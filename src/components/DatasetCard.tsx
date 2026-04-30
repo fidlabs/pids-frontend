@@ -18,6 +18,28 @@ export function DatasetCard({
   const [showMetadata, setShowMetadata] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const normalizeProjectUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    // Accept already-valid absolute URLs; otherwise assume HTTPS.
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  const getProjectHostname = (url: string) => {
+    const normalized = normalizeProjectUrl(url);
+    if (!normalized) return url;
+    try {
+      return new URL(normalized).hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  const projectHref = dataset.projectUrl ? normalizeProjectUrl(dataset.projectUrl) : null;
+
   const handleDownloadManifest = async () => {
     try {
       const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
@@ -106,11 +128,11 @@ export function DatasetCard({
             {dataset.description}
           </p>
           
-          {dataset.projectUrl && (
+          {projectHref && (
             <div className="flex items-center gap-2 text-sm">
               <ExternalLink className="h-4 w-4 text-chart-1" />
               <a 
-                href={dataset.projectUrl} 
+                href={projectHref}
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-chart-1 hover:text-chart-1/80 underline"
@@ -242,17 +264,17 @@ export function DatasetCard({
                     <DialogDescription>{dataset.description}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    {dataset.projectUrl && (
+                    {projectHref && (
                       <div>
                         <label className="text-sm font-medium">Project Website</label>
                         <p className="text-sm">
                           <a 
-                            href={dataset.projectUrl} 
+                            href={projectHref}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-chart-1 hover:text-chart-1/80 underline"
                           >
-                            {new URL(dataset.projectUrl).hostname}
+                            {getProjectHostname(dataset.projectUrl!)}
                           </a>
                         </p>
                       </div>

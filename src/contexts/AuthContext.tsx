@@ -32,27 +32,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   
   // Debug counters
-  const renderCount = React.useRef(0);
   const effectCount = React.useRef(0);
   const isInitializing = React.useRef(false);
-  renderCount.current += 1;
-  console.log(`🔄 AuthProvider render #${renderCount.current}`);
 
   useEffect(() => {
     // Prevent multiple initializations
     if (isInitializing.current) {
-      console.log('🚫 AuthProvider useEffect already running, skipping...');
       return;
     }
     
     effectCount.current += 1;
-    console.log(`🚀 AuthProvider useEffect #${effectCount.current}`);
     isInitializing.current = true;
     
     const initKeycloak = async () => {
       try {
-        console.log('Initializing Keycloak...');
-        
         // Get API base URL from environment
         const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
         console.log('Using API base URL for Keycloak config:', API_BASE_URL);
@@ -71,9 +64,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Use the URL provided by the API (already converted for browser access)
         const keycloakUrl = config.data.url;
-        console.log('Using Keycloak URL:', keycloakUrl);
-        console.log('Frontend origin (redirect URI will be):', window.location.origin);
-        console.log('Expected redirect URI should be:', window.location.origin);
         
         const kc = new Keycloak({
           url: keycloakUrl,
@@ -95,8 +85,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             handleLogout();
           });
         };
-
-        console.log('Initializing Keycloak client...');
         
         // PKCE requires Web Crypto API which only works over HTTPS
         // Disable PKCE for HTTP (production without SSL)

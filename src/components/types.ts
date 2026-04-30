@@ -7,6 +7,7 @@ export interface Dataset {
   verifiedDate?: string; // Date when the dataset was verified/approved
   description: string;
   size: string;
+  sizeBytes?: number; // Raw size in bytes from API
   tags: string[];
   downloadUrl: string;
   projectUrl?: string; // Project website URL from manifest
