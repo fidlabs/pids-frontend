@@ -323,6 +323,54 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// PATCH /api/datasets/:id/tags - Update dataset tags (admin only)
+router.patch('/:id/tags', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tags must be provided as an array of strings'
+      });
+    }
+
+    // Normalize tags: trim, lowercase, remove empties, dedupe, cap count.
+    const normalizedTags = [...new Set(
+      tags
+        .map((tag) => (typeof tag === 'string' ? tag.trim().toLowerCase() : ''))
+        .filter((tag) => tag.length > 0)
+    )].slice(0, 50);
+
+    const dataset = await Dataset.findByIdAndUpdate(
+      id,
+      {
+        tags: normalizedTags,
+        dateUpdated: new Date()
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!dataset) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dataset not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: dataset
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // DELETE /api/datasets/:id - Delete dataset (admin only)
 router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {

@@ -1033,7 +1033,6 @@ const seedDatabase = async () => {
       });
     });
     
-    console.log('\nTop Tags:');
     Object.entries(tagCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)

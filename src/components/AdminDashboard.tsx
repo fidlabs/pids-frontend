@@ -9,7 +9,8 @@ export function AdminDashboard({
   pendingDatasets, 
   onApproveDataset, 
   onRejectDataset, 
-  onRemoveDataset 
+  onRemoveDataset,
+  onUpdateTags
 }: AdminDashboardProps) {
   const approvedDatasets = datasets.filter(d => d.status === 'approved');
 
@@ -81,6 +82,7 @@ export function AdminDashboard({
                   isAdmin
                   onApprove={onApproveDataset}
                   onReject={onRejectDataset}
+                  onUpdateTags={onUpdateTags}
                 />
               ))}
             </div>
@@ -102,6 +104,7 @@ export function AdminDashboard({
                 dataset={dataset}
                 isAdmin
                 onRemove={onRemoveDataset}
+                onUpdateTags={onUpdateTags}
                 onDownloadCache={() => console.log('Download to cache:', dataset.id)}
               />
             ))}

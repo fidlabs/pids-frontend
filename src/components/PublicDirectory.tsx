@@ -39,6 +39,72 @@ export function PublicDirectory({ datasets, onExploreDataset }: PublicDirectoryP
       );
     }
 
+    // Apply date range filter
+    if (filters.dateRange !== 'all') {
+      const now = new Date();
+      const cutoff = new Date(now);
+
+      if (filters.dateRange === 'week') {
+        cutoff.setDate(now.getDate() - 7);
+      } else if (filters.dateRange === 'month') {
+        cutoff.setMonth(now.getMonth() - 1);
+      } else if (filters.dateRange === 'year') {
+        cutoff.setFullYear(now.getFullYear() - 1);
+      }
+
+      filtered = filtered.filter((dataset) => {
+        if (!dataset.uploadDate) return false;
+        const uploadDate = new Date(dataset.uploadDate);
+        if (Number.isNaN(uploadDate.getTime())) return false;
+        return uploadDate >= cutoff;
+      });
+    }
+
+    // Apply size range filter
+    if (filters.sizeRange !== 'all') {
+      const parseSizeToBytes = (size: string): number => {
+        const match = size.trim().match(/^([\d.]+)\s*(bytes|kb|mb|gb|tb)$/i);
+        if (!match) return 0;
+
+        const value = Number.parseFloat(match[1]);
+        if (Number.isNaN(value)) return 0;
+
+        const unit = match[2].toLowerCase();
+        switch (unit) {
+          case 'tb':
+            return value * 1024 * 1024 * 1024 * 1024;
+          case 'gb':
+            return value * 1024 * 1024 * 1024;
+          case 'mb':
+            return value * 1024 * 1024;
+          case 'kb':
+            return value * 1024;
+          case 'bytes':
+            return value;
+          default:
+            return 0;
+        }
+      };
+
+      filtered = filtered.filter((dataset) => {
+        const sizeBytes = typeof dataset.sizeBytes === 'number'
+          ? dataset.sizeBytes
+          : parseSizeToBytes(dataset.size);
+
+        // small: < 100MB, medium: 100MB - 1GB, large: > 1GB
+        if (filters.sizeRange === 'small') {
+          return sizeBytes < 100 * 1024 * 1024;
+        }
+        if (filters.sizeRange === 'medium') {
+          return sizeBytes >= 100 * 1024 * 1024 && sizeBytes <= 1024 * 1024 * 1024;
+        }
+        if (filters.sizeRange === 'large') {
+          return sizeBytes > 1024 * 1024 * 1024;
+        }
+        return true;
+      });
+    }
+
     return filtered;
   }, [datasets, searchQuery, filters]);
 

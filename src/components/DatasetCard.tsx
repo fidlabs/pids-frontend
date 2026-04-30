@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { DatasetCardProps } from './types';
-import { Download, Info, Check, X, Trash2, HardDrive, FolderOpen, ExternalLink } from 'lucide-react';
+import { Download, Info, Check, X, Trash2, HardDrive, FolderOpen, ExternalLink, Tags } from 'lucide-react';
 
 export function DatasetCard({ 
   dataset, 
@@ -12,11 +13,16 @@ export function DatasetCard({
   onApprove, 
   onReject, 
   onRemove, 
+  onUpdateTags,
   onDownloadCache,
   onExplore 
 }: DatasetCardProps) {
   const [showMetadata, setShowMetadata] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTagEditor, setShowTagEditor] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+  const [editableTags, setEditableTags] = useState<string[]>(dataset.tags || []);
+  const [isSavingTags, setIsSavingTags] = useState(false);
 
   const normalizeProjectUrl = (url: string) => {
     const trimmed = url.trim();
@@ -39,6 +45,37 @@ export function DatasetCard({
   };
 
   const projectHref = dataset.projectUrl ? normalizeProjectUrl(dataset.projectUrl) : null;
+
+  const resetTagEditor = () => {
+    setEditableTags(dataset.tags || []);
+    setTagInput('');
+  };
+
+  const addTag = () => {
+    const normalized = tagInput.trim().toLowerCase();
+    if (!normalized) return;
+    if (editableTags.includes(normalized)) {
+      setTagInput('');
+      return;
+    }
+    setEditableTags((prev) => [...prev, normalized]);
+    setTagInput('');
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setEditableTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  };
+
+  const saveTags = async () => {
+    if (!onUpdateTags) return;
+    setIsSavingTags(true);
+    try {
+      await onUpdateTags(dataset.id, editableTags);
+      setShowTagEditor(false);
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
 
   const handleDownloadManifest = async () => {
     try {
@@ -187,6 +224,92 @@ export function DatasetCard({
               
               {dataset.status === 'approved' && (
                 <>
+                  {onUpdateTags && (
+                    <Dialog
+                      open={showTagEditor}
+                      onOpenChange={(open) => {
+                        setShowTagEditor(open);
+                        if (open) resetTagEditor();
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 border-chart-1 text-chart-1 hover:bg-chart-1 hover:text-white"
+                        >
+                          <Tags className="h-4 w-4 mr-1" />
+                          Edit Tags
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Dataset Tags</DialogTitle>
+                          <DialogDescription>
+                            Add or remove tags for "{dataset.name}".
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4">
+                          <div className="flex gap-2">
+                            <Input
+                              value={tagInput}
+                              onChange={(event) => setTagInput(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ',') {
+                                  event.preventDefault();
+                                  addTag();
+                                }
+                              }}
+                              placeholder="Add tag and press Enter"
+                            />
+                            <Button type="button" variant="outline" onClick={addTag}>
+                              Add
+                            </Button>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 min-h-10">
+                            {editableTags.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">No tags set.</span>
+                            ) : (
+                              editableTags.map((tag) => (
+                                <Badge key={tag} variant="secondary" className="gap-1">
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    className="ml-1 text-xs"
+                                    onClick={() => removeTag(tag)}
+                                    aria-label={`Remove ${tag}`}
+                                  >
+                                    x
+                                  </button>
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => setShowTagEditor(false)}
+                              disabled={isSavingTags}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              className="flex-1"
+                              onClick={saveTags}
+                              disabled={isSavingTags}
+                            >
+                              {isSavingTags ? 'Saving...' : 'Save Tags'}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
                   {onDownloadCache && (
                     <Button
                       size="sm"

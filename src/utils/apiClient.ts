@@ -927,6 +927,39 @@ const realApi = {
     }
 
     return transformDataset(result.data);
+  },
+
+  async updateDatasetTags(id: string, tags: string[], token?: string): Promise<Dataset | null> {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/datasets/${id}/tags`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ tags }),
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API request failed: ${response.statusText}`);
+    }
+
+    const result: ApiResponse<Dataset> = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update dataset tags');
+    }
+
+    return transformDataset(result.data);
   }
 };
 
@@ -1034,6 +1067,22 @@ export const apiClient = {
       console.warn('Real API failed, falling back to mock data:', error);
       console.log('🔄 Falling back to mock data for rejectDataset due to real API failure.');
       return await mockApi.rejectDataset(id);
+    }
+  },
+
+  async updateDatasetTags(id: string, tags: string[], token?: string): Promise<Dataset | null> {
+    try {
+      if (USE_MOCK_DATA) {
+        console.log('🔄 Using mock data for updateDatasetTags');
+        return await mockApi.updateDataset(id, { tags });
+      } else {
+        console.log('🔄 Using real API for updateDatasetTags');
+        return await realApi.updateDatasetTags(id, tags, token);
+      }
+    } catch (error) {
+      console.warn('Real API failed, falling back to mock data:', error);
+      console.log('🔄 Falling back to mock data for updateDatasetTags due to real API failure.');
+      return await mockApi.updateDataset(id, { tags });
     }
   },
 
