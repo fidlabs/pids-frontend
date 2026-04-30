@@ -73,7 +73,7 @@ export function CodeViewer({ content, language, filename, file, datasetId, getFi
             }}
           >
             <Download className="h-3 w-3 mr-1" />
-            Download
+            Get Manifest
           </Button>
         </div>
       </div>
