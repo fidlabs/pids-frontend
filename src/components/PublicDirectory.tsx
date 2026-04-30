@@ -11,7 +11,7 @@ export function PublicDirectory({ datasets, onExploreDataset }: PublicDirectoryP
   const [filters, setFilters] = useState<{
     tags: string[];
     dateRange: 'all' | 'week' | 'month' | 'year';
-    sizeRange: 'all' | 'small' | 'medium' | 'large';
+    sizeRange: 'all' | 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'xx-large';
   }>({
     tags: [],
     dateRange: 'all',
@@ -91,15 +91,29 @@ export function PublicDirectory({ datasets, onExploreDataset }: PublicDirectoryP
           ? dataset.sizeBytes
           : parseSizeToBytes(dataset.size);
 
-        // small: < 100MB, medium: 100MB - 1GB, large: > 1GB
+        // x-small: <100MB, small: 100MB-1GB, medium: 1GB-100GB,
+        // large: 100GB-1TB, x-large: 1TB-10TB, xx-large: >10TB
+        const MB = 1024 * 1024;
+        const GB = 1024 * MB;
+        const TB = 1024 * GB;
+
+        if (filters.sizeRange === 'x-small') {
+          return sizeBytes < 100 * MB;
+        }
         if (filters.sizeRange === 'small') {
-          return sizeBytes < 100 * 1024 * 1024;
+          return sizeBytes >= 100 * MB && sizeBytes <= 1 * GB;
         }
         if (filters.sizeRange === 'medium') {
-          return sizeBytes >= 100 * 1024 * 1024 && sizeBytes <= 1024 * 1024 * 1024;
+          return sizeBytes > 1 * GB && sizeBytes <= 100 * GB;
         }
         if (filters.sizeRange === 'large') {
-          return sizeBytes > 1024 * 1024 * 1024;
+          return sizeBytes > 100 * GB && sizeBytes <= 1 * TB;
+        }
+        if (filters.sizeRange === 'x-large') {
+          return sizeBytes > 1 * TB && sizeBytes <= 10 * TB;
+        }
+        if (filters.sizeRange === 'xx-large') {
+          return sizeBytes > 10 * TB;
         }
         return true;
       });

@@ -11,7 +11,7 @@ import { apiClient } from '../utils/apiClient';
 interface SearchFilters {
   tags: string[];
   dateRange: 'all' | 'week' | 'month' | 'year';
-  sizeRange: 'all' | 'small' | 'medium' | 'large';
+  sizeRange: 'all' | 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'xx-large';
 }
 
 interface SearchBarProps {
@@ -131,9 +131,12 @@ export function SearchBar({
           className="p-2 border rounded-md text-sm"
         >
           <option value="all">All sizes</option>
-          <option value="small">Small (&lt; 100MB)</option>
-          <option value="medium">Medium (100MB - 1GB)</option>
-          <option value="large">Large (&gt; 1GB)</option>
+          <option value="x-small">x-small (&lt; 100MB)</option>
+          <option value="small">small (100MB - 1GB)</option>
+          <option value="medium">medium (1GB - 100GB)</option>
+          <option value="large">large (100GB - 1TB)</option>
+          <option value="x-large">x-large (1TB - 10TB)</option>
+          <option value="xx-large">xx-large (&gt; 10TB)</option>
         </select>
         <select
           value={filters.dateRange}
