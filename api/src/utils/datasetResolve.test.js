@@ -1,6 +1,5 @@
 import {
   buildResolveQuery,
-  datasetContainsPieceCid,
   isLikelyPieceCid,
   normalizePieceCid,
   toResolveResult,
@@ -20,32 +19,12 @@ describe('datasetResolve', () => {
     expect(isLikelyPieceCid('bafkreie3msejhqu2vqkhyqfjnsbsq2w7o5udas7k43ecihj2ddlesgaewi')).toBe(false);
   });
 
-  test('datasetContainsPieceCid checks pieces and nested fileStructure', () => {
-    const dataset = {
-      pieces: [{ piece_cid: pieceCid, payload_cid: 'bafk...' }],
-      fileStructure: [
-        {
-          name: 'nested.car',
-          piece_cid: 'baga6ea4seaqother',
-          children: [{ name: 'deep.car', piece_cid: pieceCid }],
-        },
-      ],
-    };
-
-    expect(datasetContainsPieceCid(dataset, pieceCid)).toBe(true);
-    expect(datasetContainsPieceCid(dataset, 'baga6ea4seaqnotfound')).toBe(false);
-    expect(datasetContainsPieceCid({ fileStructure: [] }, pieceCid)).toBe(false);
-  });
-
-  test('buildResolveQuery filters approved public datasets by default', () => {
+  test('buildResolveQuery filters by pieces.piece_cid', () => {
     expect(buildResolveQuery({ pieceCid, network: 'mainnet', publicOnly: true })).toEqual({
       isPublic: true,
       status: 'approved',
       network: 'mainnet',
-      $or: [
-        { 'pieces.piece_cid': pieceCid },
-        { 'fileStructure.piece_cid': pieceCid },
-      ],
+      'pieces.piece_cid': pieceCid,
     });
   });
 

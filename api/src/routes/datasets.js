@@ -3,9 +3,7 @@ import Dataset from '../models/Dataset.js';
 import { authenticateToken, requireAdmin, optionalAuth } from '../middleware/auth.js';
 import { parseManifest, validateManifest } from '../utils/manifestParser.js';
 import {
-  buildNestedCandidateQuery,
   buildResolveQuery,
-  datasetContainsPieceCid,
   isLikelyPieceCid,
   normalizePieceCid,
   toResolveResult,
@@ -282,31 +280,12 @@ router.get('/resolve', optionalAuth, async (req, res) => {
     const isAdmin = req.user?.roles?.includes('admin') ?? false;
     const publicOnly = !isAdmin;
 
-    const directQuery = buildResolveQuery({ pieceCid, network, publicOnly });
-    const directMatches = await Dataset.find(directQuery)
+    const query = buildResolveQuery({ pieceCid, network, publicOnly });
+    const matches = await Dataset.find(query)
       .select('_id uuid title network status')
       .lean();
 
-    const resultsById = new Map(directMatches.map((dataset) => [dataset._id, toResolveResult(dataset)]));
-
-    const nestedQuery = buildNestedCandidateQuery({
-      pieceCid,
-      network,
-      publicOnly,
-      excludeIds: [...resultsById.keys()],
-    });
-
-    const nestedCandidates = await Dataset.find(nestedQuery)
-      .select('_id uuid title network status pieces fileStructure')
-      .lean();
-
-    for (const dataset of nestedCandidates) {
-      if (datasetContainsPieceCid(dataset, pieceCid)) {
-        resultsById.set(dataset._id, toResolveResult(dataset));
-      }
-    }
-
-    const datasets = [...resultsById.values()];
+    const datasets = matches.map(toResolveResult);
     const uuids = datasets.map((dataset) => dataset.uuid);
 
     console.log(`🔍 Resolved piece_cid ${pieceCid.slice(0, 16)}... → ${uuids.length} dataset(s)`);
