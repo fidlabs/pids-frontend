@@ -143,6 +143,11 @@ jobs:
           kubernetes.io/change-cause="Deploy ${{ github.sha }} by ${{ github.actor }}" \
           -n ${{ env.KUBERNETES_NAMESPACE }}
 
+        # Floating tags (frontend-main) do not change the deployment spec on set image;
+        # restart pods so imagePullPolicy: Always pulls the latest digest.
+        kubectl rollout restart deployment/frontend \
+          -n ${{ env.KUBERNETES_NAMESPACE }}
+
     - name: Update API deployment
       run: |
         kubectl set image deployment/pids-api \
@@ -151,6 +156,9 @@ jobs:
         
         kubectl annotate deployment/pids-api \
           kubernetes.io/change-cause="Deploy ${{ github.sha }} by ${{ github.actor }}" \
+          -n ${{ env.KUBERNETES_NAMESPACE }}
+
+        kubectl rollout restart deployment/pids-api \
           -n ${{ env.KUBERNETES_NAMESPACE }}
         
     - name: Verify imagePullSecrets are present
