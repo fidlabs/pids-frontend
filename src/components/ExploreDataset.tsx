@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
@@ -17,7 +17,6 @@ import {
   FileVideo, 
   FileSpreadsheet,
   FileJson,
-  Download,
   ChevronRight,
   FileCode,
   ExternalLink,
@@ -39,13 +38,8 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
   // Use dataset piece CID when no file is selected, otherwise use selectedCid. TODO should this be payload CID?
   const cidToUse = selectedFile ? selectedCid : datasetPieceCid;
 
-  const getDownloadCommand = (cid: string) => {
+  const buildRetrieveCommand = (cid: string, outputName: string) => {
     if (!cid) return '';
-
-    const outputName = selectedFile 
-      ? `${selectedFile.name.replace(/\s+/g, '_')}`
-      : `${dataset.name.replace(/\s+/g, '_')}_${cid}.car`;
-
     switch (selectedTool) {
       case 'boost':
         return `boost retrieve --provider <provider> -o ${outputName} ${cid}`;
@@ -58,22 +52,19 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
     }
   };
 
+  const getDownloadCommand = (cid: string) => {
+    if (!cid) return '';
+    const outputName = selectedFile 
+      ? `${selectedFile.name.replace(/\s+/g, '_')}`
+      : `${dataset.name.replace(/\s+/g, '_')}_${cid}.car`;
+    return buildRetrieveCommand(cid, outputName);
+  };
+
   const getCarDownloadCommand = () => {
     if (!selectedFile || !selectedFile.piece_cid) return '';
-
     const pieceCid = selectedFile.piece_cid;
     const outputName = `${pieceCid}.car`;
-
-    switch (selectedTool) {
-      case 'boost':
-        return `boost retrieve --provider <provider> -o ${outputName} ${pieceCid}`;
-      case 'lassie':
-        return `lassie fetch ${pieceCid} -o ${outputName}`;
-      case 'lotus':
-        return `lotus client retrieve --miner <provider> ${pieceCid} ${outputName}`;
-      default:
-        return '';
-    }
+    return buildRetrieveCommand(pieceCid, outputName);
   };
 
   const getToolDescription = () => {
@@ -169,19 +160,27 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
 
       {/* Storage Status Section */}
       {(() => {
-        // Use file's piece_cid if available, otherwise use dataset's piece CID
+        const pieceCount = dataset.pieces?.length ?? 0;
+        // Use file's piece_cid if available, otherwise use dataset's first piece (for explorer links)
         const pieceCidToUse = selectedFile?.piece_cid || datasetPieceCid;
         const cidForIpfs = selectedFile ? selectedCid : (dataset.pieces && dataset.pieces.length > 0 ? dataset.pieces[0].payload_cid : null);
-        
-        if (!pieceCidToUse) return null;
+        const hasStorageStatus = selectedFile ? !!pieceCidToUse : pieceCount > 0;
+
+        if (!hasStorageStatus) return null;
+
+        const totalSizeSuffix = dataset.size ? ` (${dataset.size} total)` : '';
+
+        const storageStatusMessage = selectedFile
+          ? `This file is stored in Piece ${pieceCidToUse}.`
+          : pieceCount === 1
+            ? `This dataset is stored in 1 Piece${totalSizeSuffix}.`
+            : `This dataset is stored in ${pieceCount} Pieces${totalSizeSuffix}.`;
         
         return (
           <div className="border-t pt-4 pb-4">
             <h4 className="text-sm font-medium mb-2">Storage Status</h4>
             <p className="text-sm text-muted-foreground mb-3">
-              {selectedFile 
-                ? `This file is stored in Piece ${pieceCidToUse}.`
-                : `This dataset is stored in Piece ${pieceCidToUse}.`}
+              {storageStatusMessage}
             </p>
             <div className="flex flex-wrap gap-3">
               <a
@@ -219,8 +218,8 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
       })()}
 
       <div className="border-t pt-4">
-        <div className="space-y-4">
-          {/* Tool Selector */}
+        <div className="download-instructions space-y-6">
+          {/* Tool Selector — applies to both sections below */}
           <div>
             <label className="text-sm font-medium mb-2 block">Retrieval Tool</label>
             <ToggleGroup
@@ -259,122 +258,146 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
             </ToggleGroup>
           </div>
 
-          {!cidToUse && (
-            <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
-              {selectedFile 
-                ? 'Select a file from the directory tree to view download instructions.'
-                : 'No dataset pieces available for download.'}
-            </div>
-          )}
-
-          {/* Download Instructions */}
-          {cidToUse && (
-            <>
-              <div>
-                <div className="text-sm text-muted-foreground mb-3">
-                  {getToolDescription()}
-                </div>
-                
-                {command && (
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">Command</label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyCommand}
-                        className="h-7"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
-                      {command}
-                    </div>
-                  </div>
-                )}
-
-                {/* CAR file download option */}
-                {carCommand && selectedFile?.piece_cid && (
-                  <div className="space-y-2 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Or download the entire CAR file</label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Using piece CID: <span className="font-mono">{selectedFile.piece_cid.slice(0, 16)}...</span>
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyCarCommand}
-                        className="h-7"
-                      >
-                        {copiedCar ? (
-                          <>
-                            <Check className="h-3 w-3 mr-1" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
-                      {carCommand}
-                    </div>
-                  </div>
-                )}
+          {/* 1) Full dataset — always first */}
+          <section
+            className="download-instructions__full-dataset space-y-3 pb-4 border-b border-border"
+            aria-labelledby="download-instructions-full-dataset-heading"
+          >
+            <h3 id="download-instructions-full-dataset-heading" className="text-sm font-semibold">
+              Full dataset download
+            </h3>
+              <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
+                To download the whole dataset, download the manifest then pass it to the Filecoin Large Dataset Retrieval Tool.
               </div>
+          </section>
 
-              {(() => {
-                const toolLinks = {
-                  boost: {
-                    name: 'Boost',
-                    url: 'https://boost.filecoin.io'
-                  },
-                  lassie: {
-                    name: 'Lassie',
-                    url: 'https://docs.filecoin.io/basics/how-retrieval-works/basic-retrieval'
-                  },
-                  lotus: {
-                    name: 'Lotus client',
-                    url: 'https://lotus.filecoin.io/lotus/get-started/what-is-lotus/'
-                  }
-                };
+          {/* 2) Selected file / folder — same behaviour as before */}
+          <section
+            className="download-instructions__selected-entry space-y-4"
+            aria-labelledby="download-instructions-selected-entry-heading"
+          >
+            <h3 id="download-instructions-selected-entry-heading" className="sr-only">
+              Selected file or folder
+            </h3>
 
-                const tool = toolLinks[selectedTool];
-                if (!tool) return null;
+            {!cidToUse && selectedFile && (
+              <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
+                Select a file from the directory tree to view download instructions.
+              </div>
+            )}
 
-                return (
-                  <div className="text-xs text-muted-foreground">
-                    Don't have {tool.name.toLowerCase()}?{' '}
-                    <a
-                      href={tool.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-chart-1 hover:text-chart-1/80 underline"
-                    >
-                      Get started here.
-                    </a>
+            {/* Download Instructions (unchanged inner content) */}
+            {cidToUse && (
+              <div
+                key={`download-entry-${cidToUse}-${selectedFile?.path ?? selectedFile?.id ?? 'dataset-root'}`}
+                className="space-y-4"
+              >
+                <div>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {getToolDescription()}
                   </div>
-                );
-              })()}
-            </>
-          )}
+
+                  {command && (
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Command</label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyCommand}
+                          className="h-7"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
+                        {command}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAR file download option */}
+                  {carCommand && selectedFile?.piece_cid && (
+                    <div className="space-y-2 pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="text-sm font-medium">Or download the entire CAR file</label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Using piece CID: <span className="font-mono">{selectedFile.piece_cid.slice(0, 16)}...</span>
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyCarCommand}
+                          className="h-7"
+                        >
+                          {copiedCar ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
+                        {carCommand}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {(() => {
+                  const toolLinks = {
+                    boost: {
+                      name: 'Boost',
+                      url: 'https://boost.filecoin.io'
+                    },
+                    lassie: {
+                      name: 'Lassie',
+                      url: 'https://docs.filecoin.io/basics/how-retrieval-works/basic-retrieval'
+                    },
+                    lotus: {
+                      name: 'Lotus client',
+                      url: 'https://lotus.filecoin.io/lotus/get-started/what-is-lotus/'
+                    }
+                  };
+
+                  const tool = toolLinks[selectedTool];
+                  if (!tool) return null;
+
+                  return (
+                    <div className="text-xs text-muted-foreground">
+                      Don&apos;t have {tool.name.toLowerCase()}?{' '}
+                      <a
+                        href={tool.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-chart-1 hover:text-chart-1/80 underline"
+                      >
+                        Get started here.
+                      </a>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>
@@ -481,18 +504,17 @@ export function ExploreDataset({ dataset, onBack }: ExploreDatasetProps) {
   const [selectedFile, setSelectedFile] = useState<FileStructure | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
-  // Extract CID from selected entry
-  const selectedCid = useMemo(() => {
+  // Payload / retrieval identifier for the selected tree entry (manifest may use `cid` and/or `hash`)
+  const selectedCid = (() => {
     if (!selectedFile) return null;
-
     if (selectedFile.type === 'file' || selectedFile.type === 'directory') {
-      return selectedFile.cid || null;
-    } else if (selectedFile.type === 'split-file') {
-      return null; //NYI
-    } else {
-      return null;
+      return selectedFile.cid || selectedFile.hash || null;
     }
-  }, [selectedFile]);
+    if (selectedFile.type === 'split-file') {
+      return null; // NYI
+    }
+    return null;
+  })();
 
   const getFileIcon = (file: FileStructure) => {
     const mimeType = file.mimeType?.toLowerCase() || '';
@@ -537,10 +559,10 @@ export function ExploreDataset({ dataset, onBack }: ExploreDatasetProps) {
   };
 
   const renderFileTree = (files: FileStructure[], level = 0) => {
-    return files.map((file) => {
-      const fileId = `${file.name}-${level}`;
+    return files.map((file, siblingIndex) => {
+      const fileId = file.path ?? `${file.id}-${level}-${siblingIndex}-${file.name}`;
       const isExpanded = expandedFolders.has(fileId);
-      const isSelected = selectedFile?.id === file.id;
+      const isSelected = selectedFile === file;
       
       return (
         <div key={fileId}>
@@ -659,12 +681,6 @@ export function ExploreDataset({ dataset, onBack }: ExploreDatasetProps) {
 
         {/* Download Instructions */}
         <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-2xl font-semibold flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Download Instructions
-            </CardTitle>
-          </CardHeader>
           <CardContent className="h-[calc(70vh-4rem)] p-0">
             <ScrollArea className="h-full">
               <div className="p-6">

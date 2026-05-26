@@ -2,6 +2,11 @@ import express from 'express';
 import Dataset from '../models/Dataset.js';
 import { authenticateToken, requireAdmin, optionalAuth } from '../middleware/auth.js';
 import { parseManifest, validateManifest } from '../utils/manifestParser.js';
+import {
+  buildResolveQuery,
+  isLikelyPieceCid,
+  normalizePieceCid,
+} from '../utils/datasetResolve.js';
 import { uploadFile, getStorageClient } from '../utils/storage.js';
 import multer from 'multer';
 
@@ -239,6 +244,59 @@ router.get('/tags', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// GET /api/datasets/resolve?piece_cid=...&network=mainnet
+// Resolve dataset UUID(s) for a Filecoin Piece CID (may return multiple matches).
+router.get('/resolve', optionalAuth, async (req, res) => {
+  try {
+    const pieceCid = normalizePieceCid(req.query.piece_cid);
+    const { network } = req.query;
+
+    if (!pieceCid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query parameter piece_cid is required',
+      });
+    }
+
+    if (!isLikelyPieceCid(pieceCid)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid piece_cid: expected a Filecoin Piece CID (baga...)',
+      });
+    }
+
+    if (network && !['mainnet', 'calibration'].includes(network)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid network. Must be "mainnet" or "calibration"',
+      });
+    }
+
+    const isAdmin = req.user?.roles?.includes('admin') ?? false;
+    const publicOnly = !isAdmin;
+
+    const query = buildResolveQuery({ pieceCid, network, publicOnly });
+    const matches = await Dataset.find(query)
+      .select('_id uuid')
+      .lean();
+
+    const uuids = matches.map((dataset) => dataset.uuid || dataset._id);
+
+    console.log(`🔍 Resolved piece_cid ${pieceCid.slice(0, 16)}... → ${uuids.length} dataset(s)`);
+
+    return res.json({
+      success: true,
+      data: uuids,
+    });
+  } catch (error) {
+    console.error('❌ Error in GET /api/datasets/resolve:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
