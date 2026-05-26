@@ -77,7 +77,6 @@ export interface DatasetCardProps {
 
 export interface ExploreDatasetProps {
   dataset: Dataset;
-  onBack: () => void;
 }
 
 export type ViewMode = 'directory' | 'explore';

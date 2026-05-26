@@ -9,7 +9,6 @@ import { ExploreDatasetProps, FileStructure} from './types';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { coy } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
-  ArrowLeft, 
   Folder, 
   File, 
   FileText, 
@@ -500,7 +499,7 @@ function ManifestViewer({ dataset }: { dataset: any }) {
   );
 }
 
-export function ExploreDataset({ dataset, onBack }: ExploreDatasetProps) {
+export function ExploreDataset({ dataset }: ExploreDatasetProps) {
   const [selectedFile, setSelectedFile] = useState<FileStructure | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
@@ -609,14 +608,6 @@ export function ExploreDataset({ dataset, onBack }: ExploreDatasetProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          onClick={onBack}
-          className="border-chart-1 text-chart-1 hover:bg-chart-1 hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Directory
-        </Button>
         <div>
           <h2 className="text-xl font-medium">{dataset.name}</h2>
           {dataset.projectUrl ? (
