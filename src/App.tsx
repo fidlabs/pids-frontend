@@ -6,11 +6,13 @@ import { AuthenticatedApp } from './components/AuthenticatedApp';
 import { Toaster } from '@components/ui/sonner';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
+import { PlausiblePageview } from '@components/PlausiblePageview';
 
 export default function App() {
   return (
     <ErrorBoundary>
       <Router>
+        <PlausiblePageview />
         <AuthProvider>
           <NetworkProvider>
             <Routes>
