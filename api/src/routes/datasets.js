@@ -6,7 +6,6 @@ import {
   buildResolveQuery,
   isLikelyPieceCid,
   normalizePieceCid,
-  toResolveResult,
 } from '../utils/datasetResolve.js';
 import { uploadFile, getStorageClient } from '../utils/storage.js';
 import multer from 'multer';
@@ -282,21 +281,16 @@ router.get('/resolve', optionalAuth, async (req, res) => {
 
     const query = buildResolveQuery({ pieceCid, network, publicOnly });
     const matches = await Dataset.find(query)
-      .select('_id uuid title network status')
+      .select('_id uuid')
       .lean();
 
-    const datasets = matches.map(toResolveResult);
-    const uuids = datasets.map((dataset) => dataset.uuid);
+    const uuids = matches.map((dataset) => dataset.uuid || dataset._id);
 
     console.log(`🔍 Resolved piece_cid ${pieceCid.slice(0, 16)}... → ${uuids.length} dataset(s)`);
 
     return res.json({
       success: true,
-      data: {
-        piece_cid: pieceCid,
-        uuids,
-        datasets,
-      },
+      data: uuids,
     });
   } catch (error) {
     console.error('❌ Error in GET /api/datasets/resolve:', error);

@@ -2,7 +2,6 @@ import {
   buildResolveQuery,
   isLikelyPieceCid,
   normalizePieceCid,
-  toResolveResult,
 } from './datasetResolve.js';
 
 describe('datasetResolve', () => {
@@ -28,10 +27,4 @@ describe('datasetResolve', () => {
     });
   });
 
-  test('toResolveResult prefers manifest uuid field', () => {
-    expect(toResolveResult({ _id: '607be965-330e-4277-b559-b42dbf6c736b', uuid: '607be965-330e-4277-b559-b42dbf6c736b' })).toEqual({
-      id: '607be965-330e-4277-b559-b42dbf6c736b',
-      uuid: '607be965-330e-4277-b559-b42dbf6c736b',
-    });
-  });
 });

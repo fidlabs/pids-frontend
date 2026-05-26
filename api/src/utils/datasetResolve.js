@@ -35,8 +35,3 @@ export const buildResolveQuery = ({ pieceCid, network, publicOnly }) => {
 
   return query;
 };
-
-export const toResolveResult = (dataset) => ({
-  id: dataset._id,
-  uuid: dataset.uuid || dataset._id,
-});
