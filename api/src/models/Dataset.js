@@ -53,5 +53,8 @@ const datasetSchema = new mongoose.Schema({
 datasetSchema.index({ title: 'text', description: 'text', tags: 'text' });
 // Index for network filtering
 datasetSchema.index({ network: 1, status: 1 });
+// Index for Piece CID resolution
+datasetSchema.index({ 'pieces.piece_cid': 1 });
+datasetSchema.index({ 'fileStructure.piece_cid': 1 });
 
 export default mongoose.model('Dataset', datasetSchema); 

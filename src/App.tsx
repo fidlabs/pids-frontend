@@ -16,6 +16,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/explore" element={<AuthenticatedApp />} />
+              <Route path="/dataset/:datasetId" element={<AuthenticatedApp />} />
               <Route path="/admin" element={<AuthenticatedApp />} />
             </Routes>
             <PerformanceMonitor />

@@ -12,7 +12,7 @@ import { useNetwork } from '../contexts/NetworkContext';
 import { NetworkSwitcher } from './NetworkSwitcher';
 import { apiClient, isUsingMockData } from '../utils/apiClient';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // Mock file structures for explore feature
 const mockFileStructures = {
@@ -181,7 +181,10 @@ export function AuthenticatedApp() {
   const [viewMode, setViewMode] = useState<ViewMode>('directory');
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingDataset, setIsLoadingDataset] = useState(false);
+  const [datasetLoadError, setDatasetLoadError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { datasetId } = useParams<{ datasetId?: string }>();
 
   const formatBytes = (bytes: number): string => {
     if (bytes <= 0) return '0 Bytes';
@@ -232,6 +235,58 @@ export function AuthenticatedApp() {
   useEffect(() => {
     loadDatasets();
   }, [loadDatasets]);
+
+  useEffect(() => {
+    if (!datasetId) {
+      setDatasetLoadError(null);
+      setIsLoadingDataset(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDatasetById = async () => {
+      setIsLoadingDataset(true);
+      setDatasetLoadError(null);
+
+      try {
+        const token = keycloak?.token;
+        const dataset = await apiClient.getDataset(datasetId, token);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!dataset) {
+          setSelectedDataset(null);
+          setViewMode('directory');
+          setDatasetLoadError('Dataset not found. It may not exist or may not be available on this network.');
+          return;
+        }
+
+        setSelectedDataset(dataset);
+        setViewMode('explore');
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Failed to load dataset';
+        setSelectedDataset(null);
+        setViewMode('directory');
+        setDatasetLoadError(message);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingDataset(false);
+        }
+      }
+    };
+
+    loadDatasetById();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [datasetId, keycloak?.token, network]);
 
   const approvedDatasets = useMemo(() => {
     const approved = datasets.filter(d => d.status === 'approved');
@@ -364,11 +419,14 @@ export function AuthenticatedApp() {
   const handleExploreDataset = (dataset: Dataset) => {
     setSelectedDataset(dataset);
     setViewMode('explore');
+    navigate(`/dataset/${dataset.id}`);
   };
 
   const handleBackToDirectory = () => {
     setViewMode('directory');
     setSelectedDataset(null);
+    setDatasetLoadError(null);
+    navigate('/explore');
   };
 
   // Show loading spinner while auth is initializing
@@ -542,6 +600,8 @@ export function AuthenticatedApp() {
                     }
                     setViewMode('directory');
                     setSelectedDataset(null);
+                    setDatasetLoadError(null);
+                    navigate('/explore');
                   }}
                 >
                   {isAdminMode ? 'Exit Admin' : 'Admin'}
@@ -554,7 +614,21 @@ export function AuthenticatedApp() {
       </header>
 
       <main className="container mx-auto p-4">
-        {isLoading ? (
+        {isLoadingDataset ? (
+          <div className="flex items-center justify-center py-12">
+            <LoadingSpinner size="lg" text="Loading dataset..." />
+          </div>
+        ) : datasetLoadError ? (
+          <Card className="max-w-lg mx-auto">
+            <CardHeader>
+              <CardTitle>Unable to open dataset</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{datasetLoadError}</p>
+              <Button onClick={handleBackToDirectory}>Back to directory</Button>
+            </CardContent>
+          </Card>
+        ) : isLoading && !datasetId ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" text="Loading datasets..." />
           </div>
