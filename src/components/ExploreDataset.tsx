@@ -23,11 +23,20 @@ import {
   Check
 } from 'lucide-react';
 
-const TOOL_LINKS = {
+type RetrievalTool = 'boost' | 'lassie' | 'lotus' | 'ldr';
+
+const LDR_PAY_RPC_URL = 'https://api.node.glif.io/rpc/v1';
+
+const TOOL_LINKS: Record<RetrievalTool, { name: string; url: string }> = {
   boost: { name: 'Boost', url: 'https://boost.filecoin.io' },
   lassie: { name: 'Lassie', url: 'https://docs.filecoin.io/basics/how-retrieval-works/basic-retrieval' },
   lotus: { name: 'Lotus client', url: 'https://lotus.filecoin.io/lotus/get-started/what-is-lotus/' },
-} as const;
+  ldr: { name: 'LDR Tool', url: 'https://github.com/fidlabs/large-paid-retrievals' },
+};
+
+function buildLdrFetchCommand(pieceCid: string) {
+  return `retrieval-client fetch   --filpay-private-key-file <your-key-file>   --pay-rpc-url "${LDR_PAY_RPC_URL}"   --cid ${pieceCid}`;
+}
 
 /** File entry represents a single Piece (e.g. `{piece_cid}.car` in the manifest). */
 function isWholePieceFile(
@@ -59,8 +68,8 @@ function RetrievalToolSelector({
   selectedTool,
   onToolChange,
 }: {
-  selectedTool: 'boost' | 'lassie' | 'lotus';
-  onToolChange: (tool: 'boost' | 'lassie' | 'lotus') => void;
+  selectedTool: RetrievalTool;
+  onToolChange: (tool: RetrievalTool) => void;
 }) {
   return (
     <div className="border-t pt-4">
@@ -69,13 +78,13 @@ function RetrievalToolSelector({
         type="single"
         value={selectedTool}
         onValueChange={(value) => {
-          if (value === 'boost' || value === 'lassie' || value === 'lotus') {
+          if (value === 'boost' || value === 'lassie' || value === 'lotus' || value === 'ldr') {
             onToolChange(value);
           }
         }}
         variant="outline"
         size="default"
-        className="shadow-md"
+        className="shadow-md flex-wrap"
       >
         <ToggleGroupItem
           value="lassie"
@@ -98,6 +107,13 @@ function RetrievalToolSelector({
         >
           Lotus
         </ToggleGroupItem>
+        <ToggleGroupItem
+          value="ldr"
+          aria-label="LDR"
+          className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
+        >
+          LDR
+        </ToggleGroupItem>
       </ToggleGroup>
     </div>
   );
@@ -105,7 +121,7 @@ function RetrievalToolSelector({
 
 // Download Instructions Component
 function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon }: { dataset: any; selectedFile: FileStructure | null; selectedCid: string | null; getFileIcon: (file: FileStructure) => JSX.Element }) {
-  const [selectedTool, setSelectedTool] = useState<'boost' | 'lassie' | 'lotus'>('lassie');
+  const [selectedTool, setSelectedTool] = useState<RetrievalTool>('lassie');
   const [copied, setCopied] = useState(false);
   const [copiedCar, setCopiedCar] = useState(false);
 
@@ -119,17 +135,26 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
         return `lassie fetch ${cid} -o ${outputName}`;
       case 'lotus':
         return `lotus client retrieve --miner <provider> ${cid} ${outputName}`;
+      case 'ldr':
+        return buildLdrFetchCommand(cid);
     }
   };
 
+  const getLdrCommand = () => {
+    if (!selectedFile?.piece_cid || selectedTool !== 'ldr') return '';
+    return buildLdrFetchCommand(selectedFile.piece_cid);
+  };
+
   const getFileDownloadCommand = () => {
-    if (!selectedFile || !selectedCid) return '';
+    if (!selectedFile) return '';
+    if (selectedTool === 'ldr') return getLdrCommand();
+    if (!selectedCid) return '';
     const outputName = selectedFile.name.replace(/\s+/g, '_');
     return buildRetrieveCommand(selectedCid, outputName);
   };
 
   const getCarDownloadCommand = () => {
-    if (!selectedFile?.piece_cid) return '';
+    if (!selectedFile?.piece_cid || selectedTool === 'ldr') return '';
     return buildRetrieveCommand(selectedFile.piece_cid, `${selectedFile.piece_cid}.car`);
   };
 
@@ -141,6 +166,8 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
         return 'Retrieve using Lassie, a simple Filecoin retrieval client.\nLassie will find an appropriate storage provider automatically.';
       case 'lotus':
         return 'Retrieve from a specific storage provider using Lotus, the reference Filecoin implementation.\nUse the links above to find a storage provider and pass its actor ID as <provider>.';
+      case 'ldr':
+        return 'Retrieve using retrieval-client from the Filecoin Large Dataset Retrieval Tool.\nProvide a funded client key file; payment is made in USDFC via Filecoin Pay.';
     }
   };
 
@@ -205,9 +232,21 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
             <h3 id="download-instructions-full-dataset-heading" className="text-sm font-semibold">
               Download whole dataset
             </h3>
-            <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
-              To download the whole dataset, download the manifest then pass it to the Filecoin Large Dataset Retrieval Tool.
-            </div>
+            <p className="text-sm text-foreground mt-1">
+              To download the whole dataset, download the manifest then pass it to the{' '}
+              <a
+                href="https://github.com/fidlabs/large-paid-retrievals"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-chart-1 hover:text-chart-1/80 underline"
+              >
+                Filecoin Large Dataset Retrieval Tool
+              </a>
+              .
+            </p>
+            <p className="text-sm text-muted-foreground p-4 bg-muted rounded">
+              retrieval-client fetch  --manifest-file &lt;manifest-file&gt; --filpay-private-key-file &lt;your-key-file&gt;  --pay-rpc-url "https://api.node.glif.io/rpc/v1"
+            </p>
           </section>
 
           <section
@@ -282,7 +321,7 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
                     {getToolDescription()}
                   </div>
 
-                  {command && !isWholePiece && (
+                  {command && (!isWholePiece || selectedTool === 'ldr') && (
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium">Command</label>
@@ -304,7 +343,7 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
                     </div>
                   )}
 
-                  {carCommand && selectedFile.piece_cid && (
+                  {carCommand && selectedFile.piece_cid && selectedTool !== 'ldr' && (
                     <div className={`space-y-2 ${isWholePiece ? '' : 'pt-4 border-t'}`}>
                       <div className="flex items-center justify-between">
                         <div>
