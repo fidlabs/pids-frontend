@@ -72,8 +72,9 @@ export async function countProvidersForPiece(
   const providers = new Set<string>();
   let page = 1;
   const limit = 100;
+  let hasMore = true;
 
-  while (true) {
+  while (hasMore) {
     const url = new URL(`${baseUrl}/search`);
     url.searchParams.set('filter', pieceCid);
     url.searchParams.set('page', String(page));
@@ -86,7 +87,10 @@ export async function countProvidersForPiece(
 
     const body = (await response.json()) as FilecoinToolsSearchResponse;
     const deals = body.data ?? [];
-    if (deals.length === 0) break;
+    if (deals.length === 0) {
+      hasMore = false;
+      continue;
+    }
 
     for (const deal of deals) {
       if (deal.providerId != null && deal.providerId !== '') {
@@ -94,7 +98,7 @@ export async function countProvidersForPiece(
       }
     }
 
-    if (deals.length < limit) break;
+    hasMore = deals.length >= limit;
     page += 1;
   }
 
