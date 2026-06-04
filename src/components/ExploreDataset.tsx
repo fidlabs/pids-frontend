@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { ScrollArea } from './ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
@@ -38,6 +37,46 @@ const TOOL_LINKS: Record<RetrievalTool, { name: string; url: string }> = {
 
 function buildLdrFetchCommand(pieceCid: string) {
   return `retrieval-client fetch   --filpay-private-key-file <your-key-file>   --pay-rpc-url "${LDR_PAY_RPC_URL}"   --cid ${pieceCid}`;
+}
+
+function buildLdrManifestCommand(dataset: { manifestFile?: string; id: string }) {
+  const manifestPath =
+    dataset.manifestFile?.split('/').pop() ??
+    dataset.manifestFile ??
+    `<manifest-${dataset.id}.json>`;
+  return `retrieval-client fetch   --manifest-file ${manifestPath}   --filpay-private-key-file <your-key-file>   --pay-rpc-url "${LDR_PAY_RPC_URL}"`;
+}
+
+function CopyableCommandBlock({ command, label = 'Command' }: { command: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium">{label}</label>
+        <Button variant="outline" size="sm" onClick={handleCopy} className="h-7">
+          {copied ? (
+            <>
+              <Check className="h-3 w-3 mr-1" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3 mr-1" />
+              Copy
+            </>
+          )}
+        </Button>
+      </div>
+      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all text-foreground">{command}</div>
+    </div>
+  );
 }
 
 /** File entry represents a single Piece (e.g. `{piece_cid}.car` in the manifest). */
@@ -129,10 +168,9 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
       ? dataset.network
       : selectedNetwork;
   const [selectedTool, setSelectedTool] = useState<RetrievalTool>('lassie');
-  const [copied, setCopied] = useState(false);
-  const [copiedCar, setCopiedCar] = useState(false);
 
   const pieceCount = dataset.pieces?.length ?? 0;
+  const wholeDatasetCommand = buildLdrManifestCommand(dataset);
 
   const buildRetrieveCommand = (cid: string, outputName: string) => {
     switch (selectedTool) {
@@ -178,22 +216,6 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
     }
   };
 
-  const handleCopyCommand = async () => {
-    const command = getFileDownloadCommand();
-    if (!command) return;
-    await navigator.clipboard.writeText(command);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyCarCommand = async () => {
-    const command = getCarDownloadCommand();
-    if (!command) return;
-    await navigator.clipboard.writeText(command);
-    setCopiedCar(true);
-    setTimeout(() => setCopiedCar(false), 2000);
-  };
-
   const command = getFileDownloadCommand();
   const carCommand = getCarDownloadCommand();
   const tool = TOOL_LINKS[selectedTool];
@@ -202,7 +224,7 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
   const canDownloadFile = selectedFile && (selectedCid || (isWholePiece && selectedFile.piece_cid));
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-6">
       {/* Dataset summary — always visible */}
       <div className="space-y-3 pb-4">
         <div className="flex items-center gap-2">
@@ -252,9 +274,7 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
               </a>
               .
             </p>
-            <p className="text-sm text-muted-foreground p-4 bg-muted rounded">
-              retrieval-client fetch  --manifest-file &lt;manifest-file&gt; --filpay-private-key-file &lt;your-key-file&gt;  --pay-rpc-url "https://api.node.glif.io/rpc/v1"
-            </p>
+            <CopyableCommandBlock command={wholeDatasetCommand} />
           </section>
 
           <section
@@ -330,53 +350,22 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
                   </div>
 
                   {command && (!isWholePiece || selectedTool === 'ldr') && (
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Command</label>
-                        <Button variant="outline" size="sm" onClick={handleCopyCommand} className="h-7">
-                          {copied ? (
-                            <>
-                              <Check className="h-3 w-3 mr-1" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">{command}</div>
+                    <div className="mb-4">
+                      <CopyableCommandBlock command={command} />
                     </div>
                   )}
 
                   {carCommand && selectedFile.piece_cid && selectedTool !== 'ldr' && (
-                    <div className={`space-y-2 ${isWholePiece ? '' : 'pt-4 border-t'}`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <label className="text-sm font-medium">
-                            {isWholePiece ? 'Download the entire Piece CAR' : 'Or download the entire Piece CAR'}
-                          </label>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Using piece CID: <span className="font-mono">{selectedFile.piece_cid.slice(0, 16)}...</span>
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={handleCopyCarCommand} className="h-7">
-                          {copiedCar ? (
-                            <>
-                              <Check className="h-3 w-3 mr-1" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3 mr-1" />
-                              Copy
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">{carCommand}</div>
+                    <div className={isWholePiece ? '' : 'pt-4 border-t'}>
+                      <CopyableCommandBlock
+                        command={carCommand}
+                        label={
+                          isWholePiece ? 'Download the entire Piece CAR' : 'Or download the entire Piece CAR'
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Using piece CID: <span className="font-mono">{selectedFile.piece_cid.slice(0, 16)}...</span>
+                      </p>
                     </div>
                   )}
                 </div>
@@ -455,7 +444,7 @@ function ManifestViewer({ dataset }: { dataset: any }) {
 
   if (isLoading) {
     return (
-      <div className="h-[55vh] flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-chart-1 mx-auto mb-2"></div>
           <p className="text-sm text-muted-foreground">Loading manifest...</p>
@@ -466,7 +455,7 @@ function ManifestViewer({ dataset }: { dataset: any }) {
 
   if (error) {
     return (
-      <div className="h-[55vh] flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <p className="text-sm text-destructive mb-2">Error loading manifest</p>
           <p className="text-xs text-muted-foreground">{error}</p>
@@ -476,7 +465,7 @@ function ManifestViewer({ dataset }: { dataset: any }) {
   }
 
   return (
-    <div className="h-[55vh] overflow-auto">
+    <div className="overflow-x-auto pb-4">
       <div className="p-4 bg-muted rounded" style={{ minWidth: 'max-content' }}>
         <SyntaxHighlighter
           language="json"
@@ -624,10 +613,10 @@ export function ExploreDataset({ dataset }: ExploreDatasetProps) {
         </div>
       </div>
 
-      {/* Explorer Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[70vh]">
+      {/* Explorer Interface — cards grow with content; page scrolls */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* File Tree */}
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 h-fit">
           <CardContent className="p-0">
             <Tabs defaultValue="files" className="w-full">
               <div className="px-4 pt-4 pb-2">
@@ -636,10 +625,10 @@ export function ExploreDataset({ dataset }: ExploreDatasetProps) {
                   <TabsTrigger value="manifest" className="text-xs">View as manifest</TabsTrigger>
                 </TabsList>
               </div>
-              
+
               <TabsContent value="files" className="mt-2">
                 <div className="px-4 pb-2">
-                  <div 
+                  <div
                     className="flex items-center gap-2 mb-3 cursor-pointer hover:bg-muted/50 rounded p-2 -m-2 transition-colors"
                     onClick={() => setSelectedFile(null)}
                   >
@@ -647,18 +636,18 @@ export function ExploreDataset({ dataset }: ExploreDatasetProps) {
                     <span className="text-sm font-medium">{dataset.name} Dataset</span>
                   </div>
                 </div>
-                <ScrollArea className="h-[55vh] px-4">
+                <div className="px-4 pb-4">
                   {currentFiles.length > 0 ? (
                     renderFileTree(currentFiles)
                   ) : (
-                    <div className="p-4 text-center text-muted-foreground">
+                    <div className="py-4 text-center text-muted-foreground">
                       <File className="h-8 w-8 mx-auto mb-2" />
                       <p className="text-sm">No files available for exploration</p>
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </TabsContent>
-              
+
               <TabsContent value="manifest" className="mt-2">
                 <div className="px-4">
                   <ManifestViewer dataset={dataset} />
@@ -669,13 +658,9 @@ export function ExploreDataset({ dataset }: ExploreDatasetProps) {
         </Card>
 
         {/* Download Instructions */}
-        <Card className="lg:col-span-2">
-          <CardContent className="h-[calc(70vh-4rem)] p-0">
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                <DownloadInstructions dataset={dataset} selectedFile={selectedFile} selectedCid={selectedCid} getFileIcon={getFileIcon} />
-              </div>
-            </ScrollArea>
+        <Card className="lg:col-span-2 h-fit">
+          <CardContent className="p-6">
+            <DownloadInstructions dataset={dataset} selectedFile={selectedFile} selectedCid={selectedCid} getFileIcon={getFileIcon} />
           </CardContent>
         </Card>
       </div>
