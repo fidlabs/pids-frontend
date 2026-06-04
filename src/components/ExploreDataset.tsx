@@ -5,7 +5,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
-import { ExploreDatasetProps, FileStructure} from './types';
+import { ExploreDatasetProps, FileStructure, Piece } from './types';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { coy } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
@@ -23,22 +23,95 @@ import {
   Check
 } from 'lucide-react';
 
+const TOOL_LINKS = {
+  boost: { name: 'Boost', url: 'https://boost.filecoin.io' },
+  lassie: { name: 'Lassie', url: 'https://docs.filecoin.io/basics/how-retrieval-works/basic-retrieval' },
+  lotus: { name: 'Lotus client', url: 'https://lotus.filecoin.io/lotus/get-started/what-is-lotus/' },
+} as const;
+
+/** File entry represents a single Piece (e.g. `{piece_cid}.car` in the manifest). */
+function isWholePieceFile(
+  file: FileStructure,
+  payloadCid: string | null,
+  pieces?: Piece[],
+): boolean {
+  if (!file.piece_cid) return false;
+  if (file.name === `${file.piece_cid}.car`) return true;
+  const piece = pieces?.find((p) => p.piece_cid === file.piece_cid);
+  return Boolean(piece && payloadCid && piece.payload_cid === payloadCid);
+}
+
+function StorageStatusLinks({ pieceCid }: { pieceCid: string }) {
+  return (
+    <a
+      href={`https://filecoin.tools/search?q=${pieceCid}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm text-chart-1 hover:text-chart-1/80 underline flex items-center gap-1"
+    >
+      Check on filecoin.tools
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  );
+}
+
+function RetrievalToolSelector({
+  selectedTool,
+  onToolChange,
+}: {
+  selectedTool: 'boost' | 'lassie' | 'lotus';
+  onToolChange: (tool: 'boost' | 'lassie' | 'lotus') => void;
+}) {
+  return (
+    <div className="border-t pt-4">
+      <label className="text-sm font-medium mb-2 block">Choose Retrieval Tool</label>
+      <ToggleGroup
+        type="single"
+        value={selectedTool}
+        onValueChange={(value) => {
+          if (value === 'boost' || value === 'lassie' || value === 'lotus') {
+            onToolChange(value);
+          }
+        }}
+        variant="outline"
+        size="default"
+        className="shadow-md"
+      >
+        <ToggleGroupItem
+          value="lassie"
+          aria-label="Lassie"
+          className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
+        >
+          Lassie
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="boost"
+          aria-label="Boost"
+          className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
+        >
+          Boost
+        </ToggleGroupItem>
+        <ToggleGroupItem
+          value="lotus"
+          aria-label="Lotus"
+          className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
+        >
+          Lotus
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </div>
+  );
+}
+
 // Download Instructions Component
 function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon }: { dataset: any; selectedFile: FileStructure | null; selectedCid: string | null; getFileIcon: (file: FileStructure) => JSX.Element }) {
   const [selectedTool, setSelectedTool] = useState<'boost' | 'lassie' | 'lotus'>('lassie');
   const [copied, setCopied] = useState(false);
   const [copiedCar, setCopiedCar] = useState(false);
 
-  // Get dataset-level piece CID for entire dataset download
-  const datasetPieceCid = dataset.pieces && dataset.pieces.length > 0 
-    ? dataset.pieces[0].piece_cid 
-    : null;
-
-  // Use dataset piece CID when no file is selected, otherwise use selectedCid. TODO should this be payload CID?
-  const cidToUse = selectedFile ? selectedCid : datasetPieceCid;
+  const pieceCount = dataset.pieces?.length ?? 0;
 
   const buildRetrieveCommand = (cid: string, outputName: string) => {
-    if (!cid) return '';
     switch (selectedTool) {
       case 'boost':
         return `boost retrieve --provider <provider> -o ${outputName} ${cid}`;
@@ -46,266 +119,174 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
         return `lassie fetch ${cid} -o ${outputName}`;
       case 'lotus':
         return `lotus client retrieve --miner <provider> ${cid} ${outputName}`;
-      default:
-        return '';
     }
   };
 
-  const getDownloadCommand = (cid: string) => {
-    if (!cid) return '';
-    const outputName = selectedFile 
-      ? `${selectedFile.name.replace(/\s+/g, '_')}`
-      : `${dataset.name.replace(/\s+/g, '_')}_${cid}.car`;
-    return buildRetrieveCommand(cid, outputName);
+  const getFileDownloadCommand = () => {
+    if (!selectedFile || !selectedCid) return '';
+    const outputName = selectedFile.name.replace(/\s+/g, '_');
+    return buildRetrieveCommand(selectedCid, outputName);
   };
 
   const getCarDownloadCommand = () => {
-    if (!selectedFile || !selectedFile.piece_cid) return '';
-    const pieceCid = selectedFile.piece_cid;
-    const outputName = `${pieceCid}.car`;
-    return buildRetrieveCommand(pieceCid, outputName);
+    if (!selectedFile?.piece_cid) return '';
+    return buildRetrieveCommand(selectedFile.piece_cid, `${selectedFile.piece_cid}.car`);
   };
 
   const getToolDescription = () => {
     switch (selectedTool) {
       case 'boost':
-        return 'Retrieve from this storage provider using the Filecoin boost client.';
+        return 'Retrieve from a specific storage provider using the Filecoin boost client.\nUse the links above to find a storage provider and pass its actor ID as <provider>.';
       case 'lassie':
-        return 'Retrieve using Lassie, a simple Filecoin retrieval client.';
+        return 'Retrieve using Lassie, a simple Filecoin retrieval client.\nLassie will find an appropriate storage provider automatically.';
       case 'lotus':
-        return 'Retrieve using Lotus, the reference Filecoin implementation.';
-      default:
-        return '';
+        return 'Retrieve from a specific storage provider using Lotus, the reference Filecoin implementation.\nUse the links above to find a storage provider and pass its actor ID as <provider>.';
     }
   };
 
   const handleCopyCommand = async () => {
-    if (!cidToUse) return;
-    const command = getDownloadCommand(cidToUse);
-    if (command) {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    const command = getFileDownloadCommand();
+    if (!command) return;
+    await navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleCopyCarCommand = async () => {
     const command = getCarDownloadCommand();
-    if (command) {
-      await navigator.clipboard.writeText(command);
-      setCopiedCar(true);
-      setTimeout(() => setCopiedCar(false), 2000);
-    }
+    if (!command) return;
+    await navigator.clipboard.writeText(command);
+    setCopiedCar(true);
+    setTimeout(() => setCopiedCar(false), 2000);
   };
 
-  const command = cidToUse ? getDownloadCommand(cidToUse) : '';
+  const command = getFileDownloadCommand();
   const carCommand = getCarDownloadCommand();
+  const tool = TOOL_LINKS[selectedTool];
+  const isWholePiece =
+    selectedFile != null && isWholePieceFile(selectedFile, selectedCid, dataset.pieces);
+  const canDownloadFile = selectedFile && (selectedCid || (isWholePiece && selectedFile.piece_cid));
 
   return (
     <div className="space-y-6 h-full flex flex-col">
-      {selectedFile && selectedCid ? (
-        // File details when a file is selected
-        <div className="space-y-3 pb-4">
-          <div className="flex items-center gap-2">
-            {getFileIcon(selectedFile)}
-            <span className="font-medium">{selectedFile.name}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">Type:</span>
-              <span className="ml-2 capitalize">{selectedFile.mimeType || selectedFile.type}</span>
-            </div>
-            {selectedFile.size && (
-              <div>
-                <span className="text-muted-foreground">Size:</span>
-                <span className="ml-2">{selectedFile.size}</span>
-              </div>
-            )}
-          </div>
-          <div>
-            <span className="text-muted-foreground text-sm">CID:</span>
-            <span className="ml-2 font-mono text-sm text-foreground mt-1 break-all">
-              {selectedCid}
-            </span>
-          </div>
+      {/* Dataset summary — always visible */}
+      <div className="space-y-3 pb-4">
+        <div className="flex items-center gap-2">
+          <Folder className="h-5 w-5 text-chart-2" />
+          <span className="font-medium text-lg">{dataset.name}</span>
         </div>
-      ) : (
-        // Dataset summary when no file is selected
-        <div className="space-y-3 pb-4">
-          <div className="flex items-center gap-2">
-            <Folder className="h-5 w-5 text-chart-2" />
-            <span className="font-medium text-lg">{dataset.name}</span>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <span className="text-muted-foreground">Size:</span>
+            <span className="ml-2">{dataset.size} - stored in {pieceCount} Pieces</span>
           </div>
-          {dataset.description && (
+          {dataset.uploadDate && (
             <div>
-              <span className="text-muted-foreground text-sm">Description:</span>
-              <p className="text-sm text-foreground mt-1">{dataset.description}</p>
+              <span className="text-muted-foreground">Upload Date:</span>
+              <span className="ml-2">{new Date(dataset.uploadDate).toLocaleDateString()}</span>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">Size:</span>
-              <span className="ml-2">{dataset.size}</span>
-            </div>
-            {dataset.uploadDate && (
-              <div>
-                <span className="text-muted-foreground">Upload Date:</span>
-                <span className="ml-2">{new Date(dataset.uploadDate).toLocaleDateString()}</span>
-              </div>
-            )}
-          </div>
         </div>
-      )}
-
-      {/* Storage Status Section */}
-      {(() => {
-        const pieceCount = dataset.pieces?.length ?? 0;
-        // Use file's piece_cid if available, otherwise use dataset's first piece (for explorer links)
-        const pieceCidToUse = selectedFile?.piece_cid || datasetPieceCid;
-        const cidForIpfs = selectedFile ? selectedCid : (dataset.pieces && dataset.pieces.length > 0 ? dataset.pieces[0].payload_cid : null);
-        const hasStorageStatus = selectedFile ? !!pieceCidToUse : pieceCount > 0;
-
-        if (!hasStorageStatus) return null;
-
-        const totalSizeSuffix = dataset.size ? ` (${dataset.size} total)` : '';
-
-        const storageStatusMessage = selectedFile
-          ? `This file is stored in Piece ${pieceCidToUse}.`
-          : pieceCount === 1
-            ? `This dataset is stored in 1 Piece${totalSizeSuffix}.`
-            : `This dataset is stored in ${pieceCount} Pieces${totalSizeSuffix}.`;
-        
-        return (
-          <div className="border-t pt-4 pb-4">
-            <h4 className="text-sm font-medium mb-2">Storage Status</h4>
-            <p className="text-sm text-muted-foreground mb-3">
-              {storageStatusMessage}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={`https://filecoin.tools/search?q=${pieceCidToUse}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-chart-1 hover:text-chart-1/80 underline flex items-center gap-1"
-              >
-                Check on filecoin.tools
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href={`https://filscan.io/tipset/storage-deal?cid=${pieceCidToUse}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-chart-1 hover:text-chart-1/80 underline flex items-center gap-1"
-              >
-                Check on filscan
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              {cidForIpfs && (
-                <a
-                  href={`https://check.ipfs.network/?cid=${cidForIpfs}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-chart-1 hover:text-chart-1/80 underline flex items-center gap-1"
-                >
-                  Check on IPFS
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      <div className="border-t pt-4">
-        <div className="download-instructions space-y-6">
-          {/* Tool Selector — applies to both sections below */}
+        {dataset.description && (
           <div>
-            <label className="text-sm font-medium mb-2 block">Retrieval Tool</label>
-            <ToggleGroup
-              type="single"
-              value={selectedTool}
-              onValueChange={(value) => {
-                if (value && (value === 'boost' || value === 'lassie' || value === 'lotus')) {
-                  setSelectedTool(value);
-                }
-              }}
-              variant="outline"
-              size="default"
-              className="shadow-md"
-            >
-              <ToggleGroupItem
-                value="lassie"
-                aria-label="Lassie"
-                className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
-              >
-                Lassie
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="boost"
-                aria-label="Boost"
-                className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
-              >
-                Boost
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="lotus"
-                aria-label="Lotus"
-                className="data-[state=on]:bg-white data-[state=on]:text-foreground data-[state=off]:bg-muted data-[state=off]:text-muted-foreground"
-              >
-                Lotus 
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <span className="text-muted-foreground text-sm">Description:</span>
+            <p className="text-sm text-foreground mt-1">{dataset.description}</p>
           </div>
+        )}
+        
+      </div>
 
-          {/* 1) Full dataset — always first */}
+      <div className="pt-4">
+        <div className="download-instructions space-y-6">
           <section
             className="download-instructions__full-dataset space-y-3 pb-4 border-b border-border"
             aria-labelledby="download-instructions-full-dataset-heading"
           >
             <h3 id="download-instructions-full-dataset-heading" className="text-sm font-semibold">
-              Full dataset download
+              Download whole dataset
             </h3>
-              <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
-                To download the whole dataset, download the manifest then pass it to the Filecoin Large Dataset Retrieval Tool.
-              </div>
+            <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
+              To download the whole dataset, download the manifest then pass it to the Filecoin Large Dataset Retrieval Tool.
+            </div>
           </section>
 
-          {/* 2) Selected file / folder — same behaviour as before */}
           <section
             className="download-instructions__selected-entry space-y-4"
             aria-labelledby="download-instructions-selected-entry-heading"
           >
-            <h3 id="download-instructions-selected-entry-heading" className="sr-only">
-              Selected file or folder
+            <h3 id="download-instructions-selected-entry-heading" className="text-sm font-semibold">
+              {isWholePiece ? 'Download single Piece' : 'Download individual files'}
             </h3>
 
-            {!cidToUse && selectedFile && (
-              <div className="text-sm text-muted-foreground p-4 bg-muted rounded">
-                Select a file from the directory tree to view download instructions.
-              </div>
-            )}
-
-            {/* Download Instructions (unchanged inner content) */}
-            {cidToUse && (
+            {!selectedFile ? (
+              <p className="text-sm text-muted-foreground p-4 bg-muted rounded">
+                To download individual files, select a file from the directory tree.
+              </p>
+            ) : !canDownloadFile ? (
+              <p className="text-sm text-muted-foreground p-4 bg-muted rounded">
+                This entry does not have a CID available for retrieval. Select a different file from the directory tree.
+              </p>
+            ) : (
               <div
-                key={`download-entry-${cidToUse}-${selectedFile?.path ?? selectedFile?.id ?? 'dataset-root'}`}
+                key={`download-entry-${selectedCid}-${selectedFile.path ?? selectedFile.id}`}
                 className="space-y-4"
               >
+                <div className="space-y-3 pb-2">
+                  <div className="flex items-center gap-2">
+                    {getFileIcon(selectedFile)}
+                    {isWholePiece && selectedFile.piece_cid ? (
+                      <span className="font-medium font-mono text-sm break-all">
+                        {selectedFile.piece_cid}
+                        {selectedFile.size ? ` (${selectedFile.size})` : ''}
+                      </span>
+                    ) : (
+                      <span className="font-medium">{selectedFile.name}</span>
+                    )}
+                  </div>
+                  {!isWholePiece && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Type:</span>
+                          <span className="ml-2 capitalize">{selectedFile.mimeType || selectedFile.type}</span>
+                        </div>
+                        {selectedFile.size && (
+                          <div>
+                            <span className="text-muted-foreground">Size:</span>
+                            <span className="ml-2">{selectedFile.size}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-sm">CID:</span>
+                        <span className="ml-2 font-mono text-sm text-foreground break-all">{selectedCid}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {selectedFile.piece_cid && (
+                  <div className="pt-4 pb-2">
+                    <h4 className="text-sm font-medium mb-2">Storage Status</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      This file is stored in Piece {selectedFile.piece_cid}.
+                    </p>
+                    <StorageStatusLinks pieceCid={selectedFile.piece_cid} />
+                  </div>
+                )}
+
+                <RetrievalToolSelector selectedTool={selectedTool} onToolChange={setSelectedTool} />
+
                 <div>
-                  <div className="text-sm text-muted-foreground mb-3">
+                  <div className="text-sm text-muted-foreground mb-3 whitespace-pre-line">
                     {getToolDescription()}
                   </div>
 
-                  {command && (
+                  {command && !isWholePiece && (
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium">Command</label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyCommand}
-                          className="h-7"
-                        >
+                        <Button variant="outline" size="sm" onClick={handleCopyCommand} className="h-7">
                           {copied ? (
                             <>
                               <Check className="h-3 w-3 mr-1" />
@@ -319,28 +300,22 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
                           )}
                         </Button>
                       </div>
-                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
-                        {command}
-                      </div>
+                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">{command}</div>
                     </div>
                   )}
 
-                  {/* CAR file download option */}
-                  {carCommand && selectedFile?.piece_cid && (
-                    <div className="space-y-2 pt-4 border-t">
+                  {carCommand && selectedFile.piece_cid && (
+                    <div className={`space-y-2 ${isWholePiece ? '' : 'pt-4 border-t'}`}>
                       <div className="flex items-center justify-between">
                         <div>
-                          <label className="text-sm font-medium">Or download the entire CAR file</label>
+                          <label className="text-sm font-medium">
+                            {isWholePiece ? 'Download the entire Piece CAR' : 'Or download the entire Piece CAR'}
+                          </label>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Using piece CID: <span className="font-mono">{selectedFile.piece_cid.slice(0, 16)}...</span>
                           </p>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCopyCarCommand}
-                          className="h-7"
-                        >
+                        <Button variant="outline" size="sm" onClick={handleCopyCarCommand} className="h-7">
                           {copiedCar ? (
                             <>
                               <Check className="h-3 w-3 mr-1" />
@@ -354,46 +329,22 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
                           )}
                         </Button>
                       </div>
-                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">
-                        {carCommand}
-                      </div>
+                      <div className="bg-muted rounded-md p-3 font-mono text-sm break-all">{carCommand}</div>
                     </div>
                   )}
                 </div>
 
-                {(() => {
-                  const toolLinks = {
-                    boost: {
-                      name: 'Boost',
-                      url: 'https://boost.filecoin.io'
-                    },
-                    lassie: {
-                      name: 'Lassie',
-                      url: 'https://docs.filecoin.io/basics/how-retrieval-works/basic-retrieval'
-                    },
-                    lotus: {
-                      name: 'Lotus client',
-                      url: 'https://lotus.filecoin.io/lotus/get-started/what-is-lotus/'
-                    }
-                  };
-
-                  const tool = toolLinks[selectedTool];
-                  if (!tool) return null;
-
-                  return (
-                    <div className="text-xs text-muted-foreground">
-                      Don&apos;t have {tool.name.toLowerCase()}?{' '}
-                      <a
-                        href={tool.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-chart-1 hover:text-chart-1/80 underline"
-                      >
-                        Get started here.
-                      </a>
-                    </div>
-                  );
-                })()}
+                <div className="text-xs text-muted-foreground">
+                  Don&apos;t have {tool.name.toLowerCase()}?{' '}
+                  <a
+                    href={tool.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-chart-1 hover:text-chart-1/80 underline"
+                  >
+                    Get started here.
+                  </a>
+                </div>
               </div>
             )}
           </section>
