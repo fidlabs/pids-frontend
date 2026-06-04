@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
 import { ExploreDatasetProps, FileStructure, Piece } from './types';
+import { DatasetHealthIndicator } from './DatasetHealthIndicator';
+import { useNetwork } from '../contexts/NetworkContext';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { coy } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
@@ -121,6 +123,11 @@ function RetrievalToolSelector({
 
 // Download Instructions Component
 function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon }: { dataset: any; selectedFile: FileStructure | null; selectedCid: string | null; getFileIcon: (file: FileStructure) => JSX.Element }) {
+  const { network: selectedNetwork } = useNetwork();
+  const healthNetwork =
+    dataset.network === 'calibration' || dataset.network === 'mainnet'
+      ? dataset.network
+      : selectedNetwork;
   const [selectedTool, setSelectedTool] = useState<RetrievalTool>('lassie');
   const [copied, setCopied] = useState(false);
   const [copiedCar, setCopiedCar] = useState(false);
@@ -202,6 +209,7 @@ function DownloadInstructions({ dataset, selectedFile, selectedCid, getFileIcon 
           <Folder className="h-5 w-5 text-chart-2" />
           <span className="font-medium text-lg">{dataset.name}</span>
         </div>
+        <DatasetHealthIndicator pieces={dataset.pieces} network={healthNetwork} />
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <span className="text-muted-foreground">Size:</span>
