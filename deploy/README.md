@@ -258,32 +258,43 @@ kubectl autoscale deployment pids-api \
 kubectl get hpa -n pids-production
 ```
 
-## SSL/TLS Configuration
+## Ingress and TLS
 
-### Option 1: cert-manager (Recommended)
+Public traffic for `toads.directory` and `auth.toads.directory` goes
+Cloudflare (proxied, terminates public TLS) -> Traefik LoadBalancer -> `pids-ingress`.
+
+Traefik replaced the retired ingress-nginx controller. It runs in the `traefik`
+namespace and serves `pids-ingress` (class `nginx`) through its Kubernetes
+Ingress NGINX provider, so the `nginx.ingress.kubernetes.io/*` annotations
+still apply.
 
 ```bash
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+# Install or upgrade Traefik
+helm repo add traefik https://traefik.github.io/charts
+helm upgrade --install traefik traefik/traefik --version 42.4.1 \
+  -n traefik --create-namespace -f k8s/ingress/traefik-values.yaml
 
-# Update email in k8s/ingress/cert-issuer.yaml
-# Then apply
-kubectl apply -f k8s/ingress/cert-issuer.yaml
+# Get the ingress IP (this is what Cloudflare DNS points at)
+kubectl get svc traefik -n traefik
 
-# Update domain in k8s/ingress/ingress.yaml
-# Then apply
+# Apply the Ingress
 kubectl apply -f k8s/ingress/ingress.yaml
 ```
 
-### Option 2: Manual SSL Certificate
+The Ingress references TLS secret `pids-tls-cert`. If it is missing, Traefik
+serves its self-signed default certificate, which works with Cloudflare SSL mode
+"Full" but not "Full (strict)". To serve a real origin certificate (e.g. a
+Cloudflare Origin CA cert):
 
 ```bash
-# Create secret with your SSL certificate
 kubectl create secret tls pids-tls-cert \
   --cert=/path/to/tls.crt \
   --key=/path/to/tls.key \
   -n pids-production
 ```
+
+`k8s/ingress/cert-issuer.yaml` is an unused cert-manager template; cert-manager
+is not installed.
 
 ## Troubleshooting
 
