@@ -1,8 +1,9 @@
 # Certificate Issuer for Let's Encrypt SSL
-# Requires cert-manager to be installed
 #
-# Install cert-manager:
-# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+# UNUSED: cert-manager is not installed in pids-production and nothing applies
+# this file. Cloudflare terminates public TLS. Kept as a template in case
+# in-cluster certificates are wanted later; requires cert-manager >= v1.12
+# (for ingressClassName) and the Traefik ingress controller.
 
 ---
 apiVersion: cert-manager.io/v1
@@ -22,7 +23,7 @@ spec:
     solvers:
     - http01:
         ingress:
-          class: nginx
+          ingressClassName: traefik
 
 ---
 # Staging issuer for testing (optional)
@@ -40,5 +41,5 @@ spec:
     solvers:
     - http01:
         ingress:
-          class: nginx
+          ingressClassName: traefik
 

@@ -1,0 +1,23 @@
+# Traefik ingress controller for pids-production (replaces retired ingress-nginx).
+#
+# helm repo add traefik https://traefik.github.io/charts
+# helm upgrade --install traefik traefik/traefik --version 42.4.1 \
+#   -n traefik --create-namespace -f k8s/ingress/traefik-values.yaml
+#
+# The Ingress NGINX provider serves Ingresses of class "nginx" and understands
+# the nginx.ingress.kubernetes.io/* annotations in ingress.yaml, so the Ingress
+# itself needs no changes.
+
+providers:
+  kubernetesIngressNGINX:
+    enabled: true
+    # Off while ingress-nginx still runs, so the two controllers don't fight
+    # over the Ingress status IP. Turn on after ingress-nginx is uninstalled.
+    publishService:
+      enabled: false
+
+service:
+  spec:
+    type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-type: REGIONAL_NETWORK

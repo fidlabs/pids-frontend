@@ -1,12 +1,14 @@
-# Ingress configuration with SSL/TLS
-# This is OPTIONAL - you can use LoadBalancer service instead
+# Ingress for toads.directory / auth.toads.directory
 #
-# If using Ingress:
-# 1. Install nginx-ingress-controller
-# 2. Install cert-manager
-# 3. Apply cert-issuer.yaml
-# 4. Update host field with your domain
-# 5. Apply this file
+# Served by Traefik (see traefik-values.yaml) through its Kubernetes Ingress
+# NGINX provider, which picks up ingressClassName "nginx" and the
+# nginx.ingress.kubernetes.io/* annotations below. The "nginx" IngressClass
+# object (controller k8s.io/ingress-nginx) must exist for this to be served.
+#
+# TLS: Cloudflare proxies both hosts and terminates public TLS. pids-tls-cert
+# does not currently exist in the cluster, so Traefik serves its default
+# self-signed cert to Cloudflare (requires Cloudflare SSL mode "Full", not
+# "Full (strict)").
 
 ---
 apiVersion: networking.k8s.io/v1
@@ -15,8 +17,6 @@ metadata:
   name: pids-ingress
   namespace: pids-production
   annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"

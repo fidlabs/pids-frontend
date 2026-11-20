@@ -115,8 +115,9 @@ This document provides instructions for building, testing, and deploying the PID
 - Kubernetes deployment with 2 replicas
 - Resource limits and requests
 - Liveness and readiness probes
-- Service and Ingress configuration
-- TLS support with Let's Encrypt
+- Service and Ingress configuration (served by the cluster's default
+  IngressClass, Traefik; see `deploy/README.md`)
+- TLS support with Let's Encrypt (requires cert-manager)
 
 ## 📊 Monitoring and Health Checks
 
